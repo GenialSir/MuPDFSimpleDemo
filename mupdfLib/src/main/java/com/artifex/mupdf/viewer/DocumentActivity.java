@@ -1,5 +1,6 @@
 package com.artifex.mupdf.viewer;
 
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
@@ -7,6 +8,7 @@ import android.content.DialogInterface.OnCancelListener;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Color;
@@ -20,7 +22,6 @@ import android.text.Editable;
 import android.text.TextWatcher;
 import android.text.method.PasswordTransformationMethod;
 import android.util.DisplayMetrics;
-import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem.OnMenuItemClickListener;
@@ -40,23 +41,26 @@ import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.ViewAnimator;
 
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Locale;
 
 public class DocumentActivity extends Activity
 {
-
-	private static final String TAG = "DocumentActivity";
-
 	/* The core rendering instance */
 	enum TopBarMode {Main, Search, More};
 
 	private final int    OUTLINE_REQUEST=0;
+	private final int    PERMISSION_REQUEST=0;
 	private MuPDFCore    core;
 	private String       mFileName;
+	private String       mFileKey;
 	private ReaderView   mDocView;
 	private View         mButtonsView;
 	private boolean      mButtonsVisible;
@@ -90,6 +94,13 @@ public class DocumentActivity extends Activity
 	protected View mLayoutButton;
 	protected PopupMenu mLayoutPopupMenu;
 
+	private String toHex(byte[] digest) {
+		StringBuilder builder = new StringBuilder(2 * digest.length);
+		for (byte b : digest)
+			builder.append(String.format("%02x", b));
+		return builder.toString();
+	}
+
 	private MuPDFCore openFile(String path)
 	{
 		int lastSlashPos = path.lastIndexOf('/');
@@ -99,6 +110,7 @@ public class DocumentActivity extends Activity
 		System.out.println("Trying to open " + path);
 		try
 		{
+			mFileKey = mFileName;
 			core = new MuPDFCore(path);
 		}
 		catch (Exception e)
@@ -120,6 +132,7 @@ public class DocumentActivity extends Activity
 		System.out.println("Trying to open byte buffer");
 		try
 		{
+			mFileKey = toHex(MessageDigest.getInstance("MD5").digest(buffer));
 			core = new MuPDFCore(buffer, magic);
 		}
 		catch (Exception e)
@@ -158,12 +171,11 @@ public class DocumentActivity extends Activity
 				Uri uri = intent.getData();
 				System.out.println("URI to open is: " + uri);
 				if (uri.getScheme().equals("file")) {
-					Log.d(TAG, "Execute here one.");
+					if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
+						ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);
 					String path = uri.getPath();
-					Log.d(TAG, "Execute path is " + path);
 					core = openFile(path);
 				} else {
-					Log.d(TAG, "Execute here two.");
 					try {
 						InputStream is = getContentResolver().openInputStream(uri);
 						int len;
@@ -476,7 +488,7 @@ public class DocumentActivity extends Activity
 
 		// Reenstate last state if it was recorded
 		SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
-		mDocView.setDisplayedViewIndex(prefs.getInt("page"+mFileName, 0));
+		mDocView.setDisplayedViewIndex(prefs.getInt("page"+mFileKey, 0));
 
 		if (savedInstanceState == null || !savedInstanceState.getBoolean("ButtonsHidden", false))
 			showButtons();
@@ -509,8 +521,9 @@ public class DocumentActivity extends Activity
 	protected void onSaveInstanceState(Bundle outState) {
 		super.onSaveInstanceState(outState);
 
-		if (mFileName != null && mDocView != null) {
-			outState.putString("FileName", mFileName);
+		if (mFileKey != null && mDocView != null) {
+			if (mFileName != null)
+				outState.putString("FileName", mFileName);
 
 			// Store current page in the prefs against the file name,
 			// so that we can pick it up each time the file is loaded
@@ -518,7 +531,7 @@ public class DocumentActivity extends Activity
 			// so it can go in the bundle
 			SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
 			SharedPreferences.Editor edit = prefs.edit();
-			edit.putInt("page"+mFileName, mDocView.getDisplayedViewIndex());
+			edit.putInt("page"+mFileKey, mDocView.getDisplayedViewIndex());
 			edit.apply();
 		}
 
@@ -536,10 +549,10 @@ public class DocumentActivity extends Activity
 		if (mSearchTask != null)
 			mSearchTask.stop();
 
-		if (mFileName != null && mDocView != null) {
+		if (mFileKey != null && mDocView != null) {
 			SharedPreferences prefs = getPreferences(Context.MODE_PRIVATE);
 			SharedPreferences.Editor edit = prefs.edit();
-			edit.putInt("page"+mFileName, mDocView.getDisplayedViewIndex());
+			edit.putInt("page"+mFileKey, mDocView.getDisplayedViewIndex());
 			edit.apply();
 		}
 	}

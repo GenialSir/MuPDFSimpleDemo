@@ -30,8 +30,6 @@ import java.util.TimerTask;
  * @author genialsir@163.com (GenialSir) on 2019/11/20
  */
 public class FileListActivity extends ListActivity {
-
-
     protected final int UPDATE_DELAY = 5000;
     protected final int PERMISSION_REQUEST = 42;
 
@@ -64,8 +62,7 @@ public class FileListActivity extends ListActivity {
 
     protected boolean isExternalStorageReadable() {
         String state = Environment.getExternalStorageState();
-        if (Environment.MEDIA_MOUNTED.equals(state)
-                || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state))
+        if (Environment.MEDIA_MOUNTED.equals(state) || Environment.MEDIA_MOUNTED_READ_ONLY.equals(state))
             return true;
         return false;
     }
@@ -74,21 +71,19 @@ public class FileListActivity extends ListActivity {
         super.onCreate(savedInstanceState);
 
         /* Hide 'home' icon on old themes */
-//        getActionBar().setDisplayShowHomeEnabled(false);
-
+        if(getActionBar() != null) {
+            getActionBar().setDisplayShowHomeEnabled(false);
+        }
         prefs = getPreferences(Context.MODE_PRIVATE);
 
         topDirectory = Environment.getExternalStorageDirectory();
-        currentDirectory = new File(prefs.getString("currentDirectory",
-                topDirectory.getAbsolutePath()));
+        currentDirectory = new File(prefs.getString("currentDirectory", topDirectory.getAbsolutePath()));
 
         adapter = new ArrayAdapter<Item>(this, android.R.layout.simple_list_item_1);
         setListAdapter(adapter);
 
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
-            ActivityCompat.requestPermissions(this, new String[]{
-                    Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_DENIED)
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST);
     }
 
     public void onResume() {
@@ -178,11 +173,8 @@ public class FileListActivity extends ListActivity {
             return;
 
         Intent intent = new Intent(this, DocumentActivity.class);
-        //launch as a new document
-        // API>=21:
-        // intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT);
-        //launch as a new document
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET);
+        // API>=21: intent.addFlags(Intent.FLAG_ACTIVITY_NEW_DOCUMENT); /* launch as a new document */
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_WHEN_TASK_RESET); /* launch as a new document */
         intent.setAction(Intent.ACTION_VIEW);
         intent.setData(Uri.fromFile(item.file));
         startActivity(intent);
